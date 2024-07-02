@@ -40,7 +40,7 @@ params = {
 }
 
 # Define the derivatives
-def remus_vehicle(t, x, u_input, params):
+def remus_vehicle_numpy(t, x, u_input, params):
     u, w, q, z, theta = x
     delta_s = u_input[0]  # External control input
     
@@ -65,7 +65,6 @@ def remus_vehicle(t, x, u_input, params):
     ])
     dot = np.matmul(coeff_inv, summation)
     return dot.flatten()
-
 
 
 def remus_vehicle_torch(t,x,u_input,params):
@@ -218,6 +217,22 @@ class PINN(nn.Module):
         z = self.out_z(x)
         theta = self.out_theta(x)
         return u,w,q,z,theta
+
+    def physics_model(self, t, u_input):
+        u, w, q, z, theta = self.forward(t)
+        delta_s=u_input[0]
+        u,w,q,z,theta=x
+        X_HS = -(W - B) * torch.sin(theta)
+        Z_HS = (W - B)
+        M_HS = -(zg * W - zb * B) * torch.sin(theta) - (xg * W - xb * B) * torch.cos(theta)
+        coeff = torch.tensor([
+        [(m-X_udot), 0, m*zg],
+        [0, (m-Z_wdot), -(m*xg+Z_qdot)],
+        [m*zg, -(m*xg+M_wdot), (Iyy-M_qdot)]
+        ])
+        coeff_inv=torch.inverse(coeff)
+        
+        
 
 # Instantiate the model
 model = PINN()
