@@ -88,7 +88,7 @@ u_input[9000:] = 0.0  # 9 to 20 seconds
 
 # Create NonlinearIOSystem
 nonlinear_system = ctrl.NonlinearIOSystem(
-    updfcn=remus_vehicle,  # State derivative function
+    updfcn=remus_vehicle_numpy,  # State derivative function
     inputs=1, outputs=5, states=5, params=params,
     name='remus_vehicle'
 )
