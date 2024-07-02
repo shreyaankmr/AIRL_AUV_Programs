@@ -66,46 +66,6 @@ def remus_vehicle_numpy(t, x, u_input, params):
     dot = np.matmul(coeff_inv, summation)
     return dot.flatten()
 
-
-def remus_vehicle_torch(t,x,u_input,params):
-    delta_s=u_input[0]
-    u,w,q,z,theta=x
-    X_HS = -(W - B) * torch.sin(theta)
-    Z_HS = (W - B)
-    M_HS = -(zg * W - zb * B) * torch.sin(theta) - (xg * W - xb * B) * torch.cos(theta)
-    coeff = torch.tensor([
-    [(m-X_udot), 0, m*zg],
-    [0, (m-Z_wdot), -(m*xg+Z_qdot)],
-    [m*zg, -(m*xg+M_wdot), (Iyy-M_qdot)]
-    ])
-    coeff_inv=torch.inverse(coeff)
-    params_np = {k: torch.tensor(v, dtype=torch.float) if isinstance(v, (int, float)) else v for k, v in params.items()} # convert params to numpy arrays or torch.Tensor objects
-#     summation = torch.tensor([
-#     [X_HS + torch.tensor(params['X_uu']) * u * abs(u) + (torch.tensor(params['X_wq']) - m) * w * q + (torch.tensor(params['X_qq']) + m * xg) * q**2 + X_prop],
-#     [Z_HS + torch.tensor(params['Z_ww']) * w * abs(w) + torch.tensor(params['Z_qq']) * q * abs(q) + (torch.tensor(params['Z_uq']) + m) * u * q + torch.tensor(params['Z_uw']) * u * w + m * zg * (q**2) + torch.tensor(params['Z_uu_delta_s']) * u**2 * delta_s],
-#     [M_HS + torch.tensor(params['M_ww']) * w * abs(w) + torch.tensor(params['M_qq']) * q * abs(q) + (torch.tensor(params['M_uq']) - m * xg) * u * q - m * zg * w * q + torch.tensor(params['M_uw']) * u * w + torch.tensor(params['M_uu_delta_s']) * u**2 * delta_s],
-# ], dtype=torch.float)
-    summation = torch.stack([
-    X_HS + torch.tensor(params['X_uu']) * u * torch.abs(u) + (torch.tensor(params['X_wq']) - m) * w * q + (torch.tensor(params['X_qq']) + m * xg) * q**2 + X_prop,
-    Z_HS + torch.tensor(params['Z_ww']) * w * torch.abs(w) + torch.tensor(params['Z_qq']) * q * torch.abs(q) + (torch.tensor(params['Z_uq']) + m) * u * q + torch.tensor(params['Z_uw']) * u * w + m * zg * (q**2) + torch.tensor(params['Z_uu_delta_s']) * u**2 * delta_s,
-    M_HS + torch.tensor(params['M_ww']) * w * torch.abs(w) + torch.tensor(params['M_qq']) * q * torch.abs(q) + (torch.tensor(params['M_uq']) - m * xg) * u * q - m * zg * w * q + torch.tensor(params['M_uw']) * u * w + torch.tensor(params['M_uu_delta_s']) * u**2 * delta_s,
-], dim=0)
-    
-    coeff_inv = coeff_inv.repeat(1, t.shape[0], 1)
-    #print(coeff_inv.shape,summation.permute(2,0, 1).shape)
-    
-    dot = torch.bmm(coeff_inv, summation.permute(2, 0, 1)).permute(2, 0, 1)
-    # dot= torch.matmul(coeff_inv,summation)
-    #dot = torch.bmm(coeff_inv, summation)
-    z_dot= -u*torch.sin(theta)+w*torch.cos(theta)
-    theta_dot=q
-    part1=dot[:, :, 0].squeeze(0)
-    part2 = dot[:, :, 10000].squeeze(0)  # Shape [10000, 1]
-    part3 = dot[:, :, 20000].squeeze(0)  # Shape [10000, 1]
-    print("Dot shape is: ",part2.shape)
-    #return dot[0][0],dot[0][1],dot[0][2],z_dot,theta_dot
-    return part1,part2,part3,z_dot,theta_dot
-
     
 
 # Initial conditions
@@ -135,35 +95,6 @@ nonlinear_system = ctrl.NonlinearIOSystem(
 
 # Run the simulation
 T, yout = ctrl.input_output_response(nonlinear_system, T=t, U=u_input, X0=initial_state)
-
-# # Plot the simulation output
-# plt.figure(figsize=(10, 6))
-# plt.plot(T, yout[0], label='u (x-direction velocity)')
-# plt.plot(T, yout[1], label='w (z-direction velocity)')
-# plt.title('REMUS Underwater Vehicle Simulation')
-# plt.grid(True)
-# plt.legend()
-
-# plt.figure(figsize=(10, 6))
-# plt.plot(T, yout[4], label='theta (pitch angle)')
-# plt.plot(T, yout[2], label='q (pitch rate)')
-# plt.title('REMUS Underwater Vehicle Simulation')
-# plt.grid(True)
-# plt.legend()
-
-# plt.figure(figsize=(10, 6))
-# plt.plot(T, u_input, label='stern angle')
-# plt.title('REMUS Underwater Vehicle Simulation')
-# plt.grid(True)
-# plt.legend()
-
-# plt.figure(figsize=(10, 6))
-# plt.plot(T, yout[3], label='z (z direction position)')
-# plt.xlabel('Time (s)')
-# plt.legend()
-# plt.title('REMUS Underwater Vehicle Simulation')
-# plt.grid(True)
-# plt.show()
 
 u_true= yout[0]
 w_true= yout[1]
@@ -221,7 +152,6 @@ class PINN(nn.Module):
     def physics_model(self, t, u_input):
         u, w, q, z, theta = self.forward(t)
         delta_s=u_input[0]
-        u,w,q,z,theta=x
         X_HS = -(W - B) * torch.sin(theta)
         Z_HS = (W - B)
         M_HS = -(zg * W - zb * B) * torch.sin(theta) - (xg * W - xb * B) * torch.cos(theta)
@@ -231,9 +161,34 @@ class PINN(nn.Module):
         [m*zg, -(m*xg+M_wdot), (Iyy-M_qdot)]
         ])
         coeff_inv=torch.inverse(coeff)
-        
-        
+        X_uu = self.X_uu
+        X_wq = self.X_wq
+        X_qq = self.X_qq
+        Z_ww = self.Z_ww
+        Z_qq = self.Z_qq
+        Z_uq = self.Z_uq
+        Z_uw = self.Z_uw
+        Z_uu_delta_s = self.Z_uu_delta_s
+        M_ww = self.M_ww
+        M_qq = self.M_qq
+        M_uq = self.M_uq
+        M_uw = self.M_uw
+        M_uu_delta_s = model.M_uu_delta_s
+        summation = torch.stack([
+        X_HS + X_uu * u * torch.abs(u) + (X_wq - m) * w * q + (X_qq + m * xg) * q**2 + X_prop,
+        Z_HS + Z_ww * w * torch.abs(w) + Z_qq * q * torch.abs(q) + (Z_uq + m) * u * q + Z_uw * u * w + m * zg * (q**2) + Z_uu_delta_s * u**2 * delta_s,
+        M_HS + M_ww * w * torch.abs(w) + M_qq * q * torch.abs(q) + (M_uq - m * xg) * u * q - m * zg * w * q + M_uw * u * w + M_uu_delta_s * u**2 * delta_s,
+        ], dim=0)
+        coeff_inv = coeff_inv.repeat(1, t.shape[0], 1)
+        dot = torch.bmm(coeff_inv, summation.permute(2, 0, 1)).permute(2, 0, 1)
+        z_dot=-u*torch.sin(theta)+w*torch.cos(theta)
+        theta_dot=q
+        u_dot =dot[:, :, 0].squeeze(0)
+        w_dot = dot[:, :, 10000].squeeze(0)
+        q_dot = dot[:, :, 20000].squeeze(0) 
 
+        return u_dot,w_dot,q_dot,z_dot,theta_dot
+        
 # Instantiate the model
 model = PINN()
 
@@ -254,28 +209,8 @@ def physics_loss(model, t,u_true_tensor,w_true_tensor,q_true_tensor,z_true_tenso
     dz_dt = torch.autograd.grad(z, t, grad_outputs=torch.ones_like(z), create_graph=True)[0]
     dtheta_dt = torch.autograd.grad(theta, t, grad_outputs=torch.ones_like(theta), create_graph=True)[0]
 
-    X_uu = model.X_uu
-    X_wq = model.X_wq
-    X_qq = model.X_qq
-    Z_ww = model.Z_ww
-    Z_qq = model.Z_qq
-    Z_uq = model.Z_uq
-    Z_uw = model.Z_uw
-    Z_uu_delta_s = model.Z_uu_delta_s
-    M_ww = model.M_ww
-    M_qq = model.M_qq
-    M_uq = model.M_uq
-    M_uw = model.M_uw
-    M_uu_delta_s = model.M_uu_delta_s
-    X0 = [unum[0], wnum[0], qnum[0], znum[0], thetanum[0]]
-    X0 = np.array(X0).flatten()  # Ensure X0 is a 1D array
-    t_new = np.arange(0, 10, 0.001)
-    T, yout_torch = ctrl.input_output_response(nonlinear_system, T=t_new, U=u_input, X0=X0)
-    #yout_torch=remus_vehicle(t_new,X0,u_input,params)
-    yout_torch=remus_vehicle_torch(t,[u,w,q,z,theta],torch.tensor(u_input),params)
-    #yout_torch=torch.tensor(yout_torch)
-    #yout_torch=yout_torch.unsqueeze(-1)
-    print(yout_torch[0].shape,du_dt.shape)
+    yout_torch=model.physics_model(t,torch.tensor(u_input))
+
     physics_residual_u = du_dt - yout_torch[0]
     physics_residual_w = dw_dt - yout_torch[1]
     physics_residual_q = dq_dt - yout_torch[2]
@@ -313,7 +248,7 @@ for epoch in range(epochs):
             initial_condition_loss(model, t0_tensor,u0_tensor,w0_tensor,q0_tensor,z0_tensor,theta0_tensor))
     loss.backward()
     optimizer.step()
-    if epoch % 5 == 0:
+    if epoch % 100 == 0:
         print(f"Epoch {epoch}, Loss: {loss.item()}, X_uu: {model.X_uu.item()},X_wq: {model.X_wq.item()}")
 
 
@@ -328,29 +263,46 @@ with torch.no_grad():
 
 
 
-# # Plotting the results
-# plt.figure(figsize=(10, 5))
+# Plotting the results
+plt.figure(figsize=(10, 5))
 
-# # Plot theta (angle) over time
-# plt.subplot(2, 1, 1)
-# plt.plot(t, u_true, 'b-', label='True u')
-# plt.plot(t, u_pred, 'r--', label='Predicted u')
-# plt.xlabel('Time (s)')
-# plt.ylabel('Theta (rad)')
-# plt.title('Pendulum Angle Over Time')
-# plt.legend()
 
-# # Plot omega (angular velocity) over time
-# plt.subplot(2, 1, 2)
-# plt.plot(t, omega_true, 'b-', label='True Omega')
-# plt.plot(t, omega_pred, 'r--', label='Predicted Omega')
-# plt.xlabel('Time (s)')
-# plt.ylabel('Omega (rad/s)')
-# plt.title('Pendulum Angular Velocity Over Time')
-# plt.legend()
+plt.subplot(5, 1, 1)
+plt.plot(t, u_true, 'b-', label='True u')
+plt.plot(t, u_pred, 'r--', label='Predicted u')
+plt.xlabel('Time (s)')
+plt.ylabel('u (m/s)')
+plt.title('u pred v/s true')
+plt.legend()
+plt.subplot(5, 1, 2)
+plt.plot(t, w_true, 'b-', label='True u')
+plt.plot(t, w_pred, 'r--', label='Predicted u')
+plt.xlabel('Time (s)')
+plt.ylabel('w (m/s)')
+plt.title('w pred v/s true')
+plt.legend()
+plt.subplot(5, 1, 3)
+plt.plot(t, q_true, 'b-', label='True u')
+plt.plot(t, q_pred, 'r--', label='Predicted u')
+plt.xlabel('Time (s)')
+plt.ylabel('q (rad/s)')
+plt.title('Pitch rate q pred v/s true')
+plt.legend()
+plt.subplot(5, 1, 4)
+plt.plot(t, z_true, 'b-', label='True u')
+plt.plot(t, z_pred, 'r--', label='Predicted u')
+plt.xlabel('Time (s)')
+plt.ylabel('z (m)')
+plt.title('z pred v/s true')
+plt.legend()
+plt.subplot(5, 1, 5)
+plt.plot(t, theta_true, 'b-', label='True u')
+plt.plot(t, theta_pred, 'r--', label='Predicted u')
+plt.xlabel('Time (s)')
+plt.ylabel('theta (rad)')
+plt.title('theta pred v/s true')
+plt.legend()
 
-# plt.tight_layout()
-# plt.show()
 
 # Print the learned parameter
 print(f"Learned X_uu: {model.X_uu.item()}")
@@ -366,7 +318,3 @@ print(f"Learned M_qq: {model.X_uu.item()}")
 print(f"Learned M_uq: {model.M_uq.item()}")
 print(f"Learned M_uw: {model.M_uw.item()}")
 print(f"Learned M_uu_delta_s: {model.M_uu_delta_s.item()}")
-
-
-
-
