@@ -148,11 +148,11 @@ class PINN(nn.Module):
         self.M_uu_delta_s = nn.Parameter(torch.tensor([np.random.uniform(-5.0, 5.0)], dtype=torch.float32))  # Initial guess for M_uu_delta_s
     
     def forward(self, t):
-        # x = torch.tanh(self.fc1(t)) # tanh option
-        # x = torch.tanh(self.fc2(x))
+        x = torch.tanh(self.fc1(t)) 
+        # x = torch.tanh(self.fc2(x))  # tanh option
         # x = torch.tanh(self.fc3(x))
-        # x = nn.GELU()(self.fc1(t))
-        x =nn.GELU()(self.fc2(x))
+        x = nn.GELU()(self.fc1(t))
+        x = nn.GELU()(self.fc2(x))
         x = nn.GELU()(self.fc3(x))
         x = nn.GELU()(self.fc4(x))
         u = self.out_u(x)
