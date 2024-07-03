@@ -114,14 +114,23 @@ theta_true_tensor = torch.tensor(theta_true, dtype=torch.float32).view(-1, 1)
 class PINN(nn.Module):
     def __init__(self):
         super(PINN, self).__init__()
-        self.fc1 = nn.Linear(1, 50)
-        self.fc2 = nn.Linear(50, 50)
-        self.fc3 = nn.Linear(50, 50)
-        self.out_u = nn.Linear(50, 1)  # Output for u (x-direction velocity)
-        self.out_w = nn.Linear(50, 1)  # Output for w (z-direction velocity)
-        self.out_q = nn.Linear(50, 1)  # Output for q (pitch rate)
-        self.out_z = nn.Linear(50, 1)  # Output for z (z direction position)
-        self.out_theta = nn.Linear(50, 1)  # Output for theta (pitch angle)
+        # self.fc1 = nn.Linear(1, 50)
+        # self.fc2 = nn.Linear(50, 50)
+        # self.fc3 = nn.Linear(50, 50)
+        # self.out_u = nn.Linear(50, 1)  # Output for u (x-direction velocity)
+        # self.out_w = nn.Linear(50, 1)  # Output for w (z-direction velocity)
+        # self.out_q = nn.Linear(50, 1)  # Output for q (pitch rate)
+        # self.out_z = nn.Linear(50, 1)  # Output for z (z direction position)
+        # self.out_theta = nn.Linear(50, 1)  # Output for theta (pitch angle)
+        self.fc1 = nn.Linear(1, 100) # more no of neurons
+        self.fc2 = nn.Linear(100, 100)
+        self.fc3 = nn.Linear(100, 100)
+        self.fc4 = nn.Linear(100, 100)
+        self.out_u = nn.Linear(100, 1)  # Output for u (x-direction velocity)
+        self.out_w = nn.Linear(100, 1)  # Output for w (z-direction velocity)
+        self.out_q = nn.Linear(100, 1)  # Output for q (pitch rate)
+        self.out_z = nn.Linear(100, 1)  # Output for z (z direction position)
+        self.out_theta = nn.Linear(100, 1)  # Output for theta (pitch angle)
         
         # Randomly initialize learnable parameter within a reasonable range
         self.X_uu = nn.Parameter(torch.tensor([np.random.uniform(-5.0, 5.0)], dtype=torch.float32,requires_grad=True))  # Initial guess for X_uu
@@ -139,9 +148,13 @@ class PINN(nn.Module):
         self.M_uu_delta_s = nn.Parameter(torch.tensor([np.random.uniform(-5.0, 5.0)], dtype=torch.float32))  # Initial guess for M_uu_delta_s
     
     def forward(self, t):
-        x = torch.tanh(self.fc1(t))
-        x = torch.tanh(self.fc2(x))
-        x = torch.tanh(self.fc3(x))
+        # x = torch.tanh(self.fc1(t)) # tanh option
+        # x = torch.tanh(self.fc2(x))
+        # x = torch.tanh(self.fc3(x))
+        # x = nn.GELU()(self.fc1(t))
+        x =nn.GELU()(self.fc2(x))
+        x = nn.GELU()(self.fc3(x))
+        x = nn.GELU()(self.fc4(x))
         u = self.out_u(x)
         w = self.out_w(x)
         q = self.out_q(x)
@@ -232,7 +245,7 @@ z0_tensor = torch.tensor([[z0]], dtype=torch.float32)
 theta0_tensor = torch.tensor([[theta0]], dtype=torch.float32)
 
 # Optimizer
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
+optimizer = optim.Adam(model.parameters(), lr=1e-2)
 
 # Training loop
 epochs = 1000
