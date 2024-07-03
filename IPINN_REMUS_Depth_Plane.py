@@ -196,11 +196,6 @@ model = PINN()
 def physics_loss(model, t,u_true_tensor,w_true_tensor,q_true_tensor,z_true_tensor,theta_true_tensor):
     t = t.requires_grad_(True)
     u, w, q, z, theta = model(t)
-    unum=u.detach().numpy()
-    wnum=w.detach().numpy()
-    qnum=q.detach().numpy()
-    znum=z.detach().numpy()
-    thetanum=theta.detach().numpy()
     
     #Compute derivatives with respect to time
     du_dt = torch.autograd.grad(u, t, grad_outputs=torch.ones_like(u), create_graph=True)[0]
