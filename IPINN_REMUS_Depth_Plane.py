@@ -258,10 +258,24 @@ with torch.no_grad():
 
 
 
+# Print the learned parameter
+print(f"Learned X_uu: {model.X_uu.item()}")
+print(f"Learned X_wq: {model.X_wq.item()}")
+print(f"Learned X_qq: {model.X_qq.item()}")
+print(f"Learned Z_ww: {model.Z_ww.item()}")
+print(f"Learned Z_qq: {model.Z_qq.item()}")
+print(f"Learned Z_uq: {model.Z_uq.item()}")
+print(f"Learned Z_uw: {model.Z_uw.item()}")
+print(f"Learned Z_uu_delta_s: {model.Z_uu_delta_s.item()}")
+print(f"Learned M_ww: {model.M_ww.item()}")
+print(f"Learned M_qq: {model.X_uu.item()}")
+print(f"Learned M_uq: {model.M_uq.item()}")
+print(f"Learned M_uw: {model.M_uw.item()}")
+print(f"Learned M_uu_delta_s: {model.M_uu_delta_s.item()}")
+
+
 # Plotting the results
 plt.figure(figsize=(10, 5))
-
-
 plt.subplot(5, 1, 1)
 plt.plot(t, u_true, 'b-', label='True u')
 plt.plot(t, u_pred, 'r--', label='Predicted u')
@@ -297,19 +311,5 @@ plt.xlabel('Time (s)')
 plt.ylabel('theta (rad)')
 plt.title('theta pred v/s true')
 plt.legend()
+plt.show()
 
-
-# Print the learned parameter
-print(f"Learned X_uu: {model.X_uu.item()}")
-print(f"Learned X_wq: {model.X_wq.item()}")
-print(f"Learned X_qq: {model.X_qq.item()}")
-print(f"Learned Z_ww: {model.Z_ww.item()}")
-print(f"Learned Z_qq: {model.Z_qq.item()}")
-print(f"Learned Z_uq: {model.Z_uq.item()}")
-print(f"Learned Z_uw: {model.Z_uw.item()}")
-print(f"Learned Z_uu_delta_s: {model.Z_uu_delta_s.item()}")
-print(f"Learned M_ww: {model.M_ww.item()}")
-print(f"Learned M_qq: {model.X_uu.item()}")
-print(f"Learned M_uq: {model.M_uq.item()}")
-print(f"Learned M_uw: {model.M_uw.item()}")
-print(f"Learned M_uu_delta_s: {model.M_uu_delta_s.item()}")
