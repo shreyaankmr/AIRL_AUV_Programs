@@ -7,24 +7,27 @@ import control as ctrl
 from sklearn.metrics import mean_squared_error
 
 # Known values for the system
-m = 63.0                 # Mass of the vehicle
+m = 30.48                 # Mass of the vehicle
 X_udot = -9.3e-1            # Added mass in the surge direction
 Z_wdot = -35.5           # Added mass in the heave direction
 M_qdot = -4.88           # Added mass moment of inertia in pitch
 xg = 0.0                 # Longitudinal center of gravity
-zg = 1.96e-2             # Vertical center of gravity
+zg = 0.0196             # Vertical center of gravity
 zb = 0.0
-W = 2.99e2
-B = 3.08e2               # Hydrodynamic damping force in surge due to hydrodynamic surfaces
+W = m*9.81
+B = W + (0.75*4.44822162)               # Hydrodynamic damping force in surge due to hydrodynamic surfaces
 X_prop = 3.86         # Thrust force in surge from the propeller
 Z_qdot = -1.93
 M_wdot = -1.93
-xb = 4.37e-1
+xb = 0
 Iyy = 3.45
+cdu = 0.2;
+rho = 1030;
+Af = 0.0285;
 
 # Parameters for the system
 params = {
-    'X_uu': -1.62,
+    'X_uu': -0.5*rho*cdu*Af,# -1.62,
     'X_wq': -35.5,
     'X_qq': -1.93,
     'Z_ww': -131.0,
@@ -45,7 +48,7 @@ def remus_vehicle_numpy(t, x, u_input, params):
     delta_s = u_input[0]  # External control input
     
     X_HS = -(W - B) * np.sin(theta)
-    Z_HS = (W - B)
+    Z_HS = (W - B)*np.cos(theta)
     M_HS = -(zg * W - zb * B) * np.sin(theta) - (xg * W - xb * B) * np.cos(theta)
 
     coeff = np.array([
@@ -58,7 +61,7 @@ def remus_vehicle_numpy(t, x, u_input, params):
     coeff_inv = np.linalg.inv(coeff)
     summation = np.array([
         [X_HS + params['X_uu'] * u * abs(u) + (params['X_wq'] - m) * w * q + (params['X_qq'] + m * xg) * q**2 + X_prop],
-        [Z_HS + params['Z_ww'] * w * abs(w) + params['Z_qq'] * q * abs(q) + (params['Z_uq'] + m) * u * q + params['Z_uw'] * u * w + m * zg * (q**2) + params['Z_uu_delta_s'] * u**2 * delta_s],
+        [Z_HS + params['Z_ww'] * w * abs(w) + params['Z_qq'] * q * abs(q) + (params['Z_uq'] + m) * u * q + params['Z_uw'] * u * w + params['Z_uu_delta_s'] * u**2 * delta_s],
         [M_HS + params['M_ww'] * w * abs(w) + params['M_qq'] * q * abs(q) + (params['M_uq'] - m * xg) * u * q - m * zg * w * q + params['M_uw'] * u * w + params['M_uu_delta_s'] * u**2 * delta_s],
         [-u * np.sin(theta) + w * np.cos(theta)],
         [q]
@@ -69,7 +72,7 @@ def remus_vehicle_numpy(t, x, u_input, params):
     
 
 # Initial conditions
-initial_state = [0.0, 0.0, 0.0, 0.0, 0.0]
+initial_state = [1.5, 0.0, 0.0, 0.0, 0.0]
 u0=0.0
 w0=0.0
 q0=0.0
@@ -85,6 +88,14 @@ u_input[4000:5000] = -0.04  # 4 to 5 seconds
 u_input[5000:7000] = 0.02  # 5 to 7 seconds
 u_input[7000:9000] = -0.02  # 7 to 9 seconds
 u_input[9000:] = 0.0  # 9 to 20 seconds
+u_input[:-1]=0
+# Define the filter transfer function
+numerator = [0.5]
+denominator = [1, 0.5]
+filter_tf = ctrl.TransferFunction(numerator, denominator)
+
+# Apply the filter to the input
+t_out, u_filtered = ctrl.forced_response(filter_tf, T=t, U=u_input)
 
 # Create NonlinearIOSystem
 nonlinear_system = ctrl.NonlinearIOSystem(
@@ -94,8 +105,34 @@ nonlinear_system = ctrl.NonlinearIOSystem(
 )
 
 # Run the simulation
-T, yout = ctrl.input_output_response(nonlinear_system, T=t, U=u_input, X0=initial_state)
+T, yout = ctrl.input_output_response(nonlinear_system, T=t, U=u_filtered, X0=initial_state)
+plt.figure(figsize=(10, 6))
+plt.plot(T, yout[0], label='u (x-direction velocity)')
+plt.plot(T, yout[1], label='w (z-direction velocity)')
+plt.title('REMUS Underwater Vehicle Simulation')
+plt.grid(True)
+plt.legend()
 
+plt.figure(figsize=(10, 6))
+plt.plot(T, yout[4], label='theta (pitch angle)')
+plt.plot(T, yout[2], label='q (pitch rate)')
+plt.title('REMUS Underwater Vehicle Simulation')
+plt.grid(True)
+plt.legend()
+
+plt.figure(figsize=(10, 6))
+plt.plot(T, u_input, label='Filtered stern angle')
+plt.title('REMUS Underwater Vehicle Simulation')
+plt.grid(True)
+plt.legend()
+
+plt.figure(figsize=(10, 6))
+plt.plot(T, yout[3], label='z (z direction position)')
+plt.xlabel('Time (s)')
+plt.legend()
+plt.title('REMUS Underwater Vehicle Simulation')
+plt.grid(True)
+plt.show()
 u_true= yout[0]
 w_true= yout[1]
 q_true= yout[2]
@@ -114,18 +151,16 @@ theta_true_tensor = torch.tensor(theta_true, dtype=torch.float32).view(-1, 1)
 class PINN(nn.Module):
     def __init__(self):
         super(PINN, self).__init__()
-        # self.fc1 = nn.Linear(1, 50)
-        # self.fc2 = nn.Linear(50, 50)
-        # self.fc3 = nn.Linear(50, 50)
-        # self.out_u = nn.Linear(50, 1)  # Output for u (x-direction velocity)
-        # self.out_w = nn.Linear(50, 1)  # Output for w (z-direction velocity)
-        # self.out_q = nn.Linear(50, 1)  # Output for q (pitch rate)
-        # self.out_z = nn.Linear(50, 1)  # Output for z (z direction position)
-        # self.out_theta = nn.Linear(50, 1)  # Output for theta (pitch angle)
-        self.fc1 = nn.Linear(1, 100) # more no of neurons
+        self.fc1 = nn.Linear(1, 100)
         self.fc2 = nn.Linear(100, 100)
         self.fc3 = nn.Linear(100, 100)
         self.fc4 = nn.Linear(100, 100)
+        # self.fc5 = nn.Linear(50, 50)
+        # self.fc6 = nn.Linear(50, 50)
+        # self.fc7 = nn.Linear(50, 50)
+        # self.fc8 = nn.Linear(50, 50)
+        # self.fc9 = nn.Linear(50, 50)
+        # self.fc10 = nn.Linear(50, 50)
         self.out_u = nn.Linear(100, 1)  # Output for u (x-direction velocity)
         self.out_w = nn.Linear(100, 1)  # Output for w (z-direction velocity)
         self.out_q = nn.Linear(100, 1)  # Output for q (pitch rate)
@@ -148,13 +183,26 @@ class PINN(nn.Module):
         self.M_uu_delta_s = nn.Parameter(torch.tensor([np.random.uniform(-5.0, 5.0)], dtype=torch.float32))  # Initial guess for M_uu_delta_s
     
     def forward(self, t):
-        x = torch.tanh(self.fc1(t)) 
-        # x = torch.tanh(self.fc2(x))  # tanh option
+        # x = torch.tanh(self.fc1(t))
+        # x = torch.tanh(self.fc2(x))
         # x = torch.tanh(self.fc3(x))
+        # x = torch.tanh(self.fc4(x))
+        # x = torch.tanh(self.fc5(x))
+        # x = torch.tanh(self.fc6(x))
+        # x = torch.tanh(self.fc7(x))
+        # x = torch.tanh(self.fc8(x))
+        # x = torch.tanh(self.fc9(x))
+        # x = torch.tanh(self.fc10(x))
         x = nn.GELU()(self.fc1(t))
-        x = nn.GELU()(self.fc2(x))
+        x =nn.GELU()(self.fc2(x))
         x = nn.GELU()(self.fc3(x))
         x = nn.GELU()(self.fc4(x))
+        # x = nn.GELU()(self.fc5(x))
+        # x = nn.GELU()(self.fc6(x))
+        # x = nn.GELU()(self.fc7(x))
+        # x = nn.GELU()(self.fc8(x))
+        # x = nn.GELU()(self.fc9(x))
+        # x = nn.GELU()(self.fc10(x))
         u = self.out_u(x)
         w = self.out_w(x)
         q = self.out_q(x)
@@ -166,7 +214,7 @@ class PINN(nn.Module):
         u, w, q, z, theta = self.forward(t)
         delta_s=u_input[0]
         X_HS = -(W - B) * torch.sin(theta)
-        Z_HS = (W - B)
+        Z_HS = (W - B)*torch.cos(theta)
         M_HS = -(zg * W - zb * B) * torch.sin(theta) - (xg * W - xb * B) * torch.cos(theta)
         coeff = torch.tensor([
         [(m-X_udot), 0, m*zg],
@@ -189,7 +237,7 @@ class PINN(nn.Module):
         M_uu_delta_s = model.M_uu_delta_s
         summation = torch.stack([
         X_HS + X_uu * u * torch.abs(u) + (X_wq - m) * w * q + (X_qq + m * xg) * q**2 + X_prop,
-        Z_HS + Z_ww * w * torch.abs(w) + Z_qq * q * torch.abs(q) + (Z_uq + m) * u * q + Z_uw * u * w + m * zg * (q**2) + Z_uu_delta_s * u**2 * delta_s,
+        Z_HS + Z_ww * w * torch.abs(w) + Z_qq * q * torch.abs(q) + (Z_uq + m) * u * q + Z_uw * u * w  + Z_uu_delta_s * u**2 * delta_s,
         M_HS + M_ww * w * torch.abs(w) + M_qq * q * torch.abs(q) + (M_uq - m * xg) * u * q - m * zg * w * q + M_uw * u * w + M_uu_delta_s * u**2 * delta_s,
         ], dim=0)
         coeff_inv = coeff_inv.repeat(1, t.shape[0], 1)
@@ -246,9 +294,11 @@ theta0_tensor = torch.tensor([[theta0]], dtype=torch.float32)
 
 # Optimizer
 optimizer = optim.Adam(model.parameters(), lr=1e-2)
+#optimizer = torch.optim.LBFGS(model.parameters(), lr=0.001, max_iter=1000, max_eval=None, tolerance_grad=1e-11, tolerance_change=1e-11, history_size=100, line_search_fn='strong_wolfe')
+
 
 # Training loop
-epochs = 1000
+epochs = 10000
 for epoch in range(epochs):
     optimizer.zero_grad()
     loss = (physics_loss(model, t_tensor,u_true_tensor,w_true_tensor,q_true_tensor,z_true_tensor,theta_true_tensor) +
@@ -270,7 +320,6 @@ with torch.no_grad():
     theta_pred = theta_pred.numpy().flatten()
 
 
-
 # Print the learned parameter
 print(f"Learned X_uu: {model.X_uu.item()}")
 print(f"Learned X_wq: {model.X_wq.item()}")
@@ -286,9 +335,10 @@ print(f"Learned M_uq: {model.M_uq.item()}")
 print(f"Learned M_uw: {model.M_uw.item()}")
 print(f"Learned M_uu_delta_s: {model.M_uu_delta_s.item()}")
 
-
 # Plotting the results
 plt.figure(figsize=(10, 5))
+
+
 plt.subplot(5, 1, 1)
 plt.plot(t, u_true, 'b-', label='True u')
 plt.plot(t, u_pred, 'r--', label='Predicted u')
@@ -325,4 +375,3 @@ plt.ylabel('theta (rad)')
 plt.title('theta pred v/s true')
 plt.legend()
 plt.show()
-
