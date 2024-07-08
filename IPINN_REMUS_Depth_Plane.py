@@ -73,7 +73,7 @@ def remus_vehicle_numpy(t, x, u_input, params):
 
 # Initial conditions
 initial_state = [1.5, 0.0, 0.0, 0.0, 0.0]
-u0=0.0
+u0=1.5
 w0=0.0
 q0=0.0
 z0=0.0
