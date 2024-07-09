@@ -38,6 +38,8 @@ Separate compuatations:
 z_dot=-u*np.sin(theta)+w*np.cos(theta)
 theta_dot=q
 
-
+**************SINDY**************************************************
+feature/candidate library for SINDY:
+functions = [1,u,w,q,z,theta,u|u|,w|w|,q|q|,q**2,wq,uq,uw,sin(theta),cos(theta),u^2*delta_s]
 
 
