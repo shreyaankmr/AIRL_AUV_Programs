@@ -4,7 +4,7 @@ import pysindy as ps
 import matplotlib.pyplot as plt
 
 # Step 1: Load and preprocess data
-data = pd.read_csv('/Users/mrshreyaank/Desktop/IISC_Internship_AIRL/mss_data.csv')
+data = pd.read_csv('mss_data.csv')
 
 # Extract relevant columns for states and controls
 states = data[['X', 'Y', 'Z', 'Phi', 'Theta', 'Psi', 'U', 'V', 'W', 'P', 'Q', 'R']]
